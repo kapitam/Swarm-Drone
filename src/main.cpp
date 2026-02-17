@@ -1,75 +1,67 @@
-#include <Arduino.h>
-// Read analog inputs A0 and A1 on Arduino Nano
-// Outputs values to Serial Monitor
-
-const int pinA0 = 32;
-const int pinA1 = 33;
-
-void setup() {
-  pinMode(pinA0, INPUT);
-  pinMode(pinA1, INPUT);
-  Serial.begin(115200);  // Faster and cleaner than 9600
-}
-
-void loop() {
-  int valueA0 = analogRead(pinA0);  // 0–1023
-  int valueA1 = analogRead(pinA1);  // 0–1023
-
-  Serial.print("A0: ");
-  Serial.print(valueA0);
-  Serial.print(" | A1: ");
-  Serial.println(valueA1);
-
-  delay(100);  // 10 readings per second
-}
-
-
-
-/*
+#include <SPI.h>
+#include <RF24.h>
 #include <ESP32Servo.h>
 
+#define CE_PIN   4
+#define CSN_PIN  5
+
+RF24 radio(CE_PIN, CSN_PIN);
+
+SPIClass vspi(VSPI);
+
+const byte address[6] = "00001";
+
 Servo esc1;
-Servo esc2;
-Servo esc3;
 
-const int esc1Pin = 18;
-const int esc2Pin = 19;
-const int esc3Pin = 21;
+const int esc1Pin = 25;   // NOT 18
 
-// Standard ESC pulse range (adjust if needed)
-const int minPulse = 1000;  // microseconds
+const int minPulse = 1000;
 const int maxPulse = 2000;
 
+struct ControlPacket {
+  uint16_t ch0;
+  uint16_t ch1;
+  uint16_t ch2;
+  uint16_t ch3;
+};
+
+ControlPacket data;
+
+unsigned long lastPacketTime = 0;
+const unsigned long failsafeTimeout = 150;
+
 void setup() {
-  esc1.setPeriodHertz(50);  // ESC expects 50Hz
+  Serial.begin(115200);
+
+  // Start SPI explicitly
+  vspi.begin(18, 19, 23, CSN_PIN); 
+  radio.begin(&vspi);
+
+  radio.setDataRate(RF24_1MBPS);
+  radio.setPALevel(RF24_PA_LOW);
+  radio.setChannel(108);
+  radio.openReadingPipe(0, address);
+  radio.startListening();
+
+  esc1.setPeriodHertz(50);
   esc1.attach(esc1Pin, minPulse, maxPulse);
-
-  esc2.setPeriodHertz(50);
-  esc2.attach(esc2Pin, minPulse, maxPulse);
-
-  esc3.setPeriodHertz(50);
-  esc3.attach(esc3Pin, minPulse, maxPulse);
-
-  // Arm ESC (most require minimum throttle first)
-  esc1.writeMicroseconds(1000);
-  esc2.writeMicroseconds(1000);
-  esc3.writeMicroseconds(1000);
-  esc1.writeMicroseconds(2000);
-  esc2.writeMicroseconds(2000);
-  esc3.writeMicroseconds(2000);
-  delay(4000);
+  esc1.writeMicroseconds(minPulse);
 }
 
 void loop() {
 
-  // 25% throttle
-  esc1.writeMicroseconds(1250);
+  if (radio.available()) {
+    radio.read(&data, sizeof(data));
+    lastPacketTime = millis();
 
-  // 50% throttle
-  esc2.writeMicroseconds(1500);
+    int throttle = map(data.ch0, 0, 1023, minPulse, maxPulse);
+    throttle = constrain(throttle, minPulse, maxPulse);
 
-  // 100% throttle
-  esc3.writeMicroseconds(2000);
-  delay(5000);
+    esc1.writeMicroseconds(throttle);
+  }
+
+  // Failsafe
+  if (millis() - lastPacketTime > failsafeTimeout) {
+    esc1.writeMicroseconds(minPulse);
+  }
 }
-*/
