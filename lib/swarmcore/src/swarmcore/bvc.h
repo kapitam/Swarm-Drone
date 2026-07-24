@@ -26,7 +26,7 @@ class Bvc {
 
   // Returns 'desired' clipped so that (pos + v*horizon) stays inside our
   // buffered Voronoi cell w.r.t. every live neighbor.
-  Vec2 constrain(const Vec2& desired, const Vec2& selfPos,
+  Vec2 constrainVelocity(const Vec2& desired, const Vec2& selfPos,
                  const NeighborTable& table, uint32_t nowMs) const;
 
  private:

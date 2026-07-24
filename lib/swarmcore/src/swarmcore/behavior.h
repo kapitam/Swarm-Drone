@@ -48,7 +48,12 @@ struct BehaviorInputs {
   RcNorm rc;
   uint32_t rcAgeMs = 0;
   VehicleState self;
-  SectorArray sectors;          // fused perception (V1, or min(V1, V2))
+  SectorArray sectors;          // steering view: V1, or min-fused V1+V2
+  // Reflex view: DIRECT-measuring sensor only (ToF). The governor/stop-reflex
+  // never runs on learned perception (docs 05/07 rule). When absent, the
+  // steering view is used for both.
+  SectorArray reflexSectors;
+  bool hasReflexSectors = false;
   const NeighborTable* table = nullptr;
   uint32_t nowMs = 0;
   Vec2 goal;                    // optional flock goal

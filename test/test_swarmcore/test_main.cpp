@@ -264,9 +264,9 @@ static void test_bvc_blocks_head_on_and_allows_lateral() {
   NeighborTable t;
   t.update(mkState(2, 1, 1.0f, 0.0f, 0.0f, 0.0f), 1000, 1);  // 1 m ahead +x
   Bvc bvc;  // safety 0.5 -> maxAlong = 0.5*1.0-0.5 = 0 -> no approach allowed
-  Vec2 v = bvc.constrain({1.0f, 0.0f}, {0, 0}, t, 1000);
+  Vec2 v = bvc.constrainVelocity({1.0f, 0.0f}, {0, 0}, t, 1000);
   TEST_ASSERT_TRUE(v.x <= 1e-3f);          // approach removed
-  v = bvc.constrain({0.0f, 1.0f}, {0, 0}, t, 1000);
+  v = bvc.constrainVelocity({0.0f, 1.0f}, {0, 0}, t, 1000);
   TEST_ASSERT_FLOAT_WITHIN(0.05f, 1.0f, v.y);  // lateral untouched
 }
 
@@ -274,7 +274,7 @@ static void test_bvc_far_neighbor_no_constraint() {
   NeighborTable t;
   t.update(mkState(2, 1, 3.0f, 0.0f, 0.0f, 0.0f), 1000, 1);
   Bvc bvc;  // maxAlong = 1.0; step = 1.0*0.5 = 0.5 < 1.0 -> untouched
-  Vec2 v = bvc.constrain({1.0f, 0.0f}, {0, 0}, t, 1000);
+  Vec2 v = bvc.constrainVelocity({1.0f, 0.0f}, {0, 0}, t, 1000);
   TEST_ASSERT_FLOAT_WITHIN(0.02f, 1.0f, v.x);
 }
 

@@ -21,6 +21,7 @@ inline uint8_t crc8(const uint8_t* d, size_t n) {
 enum PacketMagic : uint8_t {
   kMagicState = 0xA5,
   kMagicCmd   = 0xC3,
+  kMagicRc    = 0xB4,
 };
 
 // Legacy manual-control packet — byte-compatible with the original sketch's
@@ -71,11 +72,21 @@ struct CmdPacket {
   uint32_t tMs;
   uint8_t  crc;
 };  // 13 bytes
+
+// RC over ESP-NOW (RC_LINK_ESPNOW fork): the legacy 4-channel payload wrapped
+// with magic + target + crc so it can share the broadcast channel.
+struct RcEspNowPacket {
+  uint8_t  magic;     // kMagicRc
+  uint8_t  targetId;  // robot id or 0xFF
+  RcPacket rc;
+  uint8_t  crc;
+};  // 11 bytes
 #pragma pack(pop)
 
 static_assert(sizeof(RcPacket) == 8, "RcPacket layout");
 static_assert(sizeof(StatePacket) == 25, "StatePacket layout");
 static_assert(sizeof(CmdPacket) == 13, "CmdPacket layout");
+static_assert(sizeof(RcEspNowPacket) == 11, "RcEspNowPacket layout");
 
 inline void sealState(StatePacket& p) {
   p.magic = kMagicState;
@@ -91,6 +102,14 @@ inline void sealCmd(CmdPacket& p) {
 }
 inline bool checkCmd(const CmdPacket& p) {
   return p.magic == kMagicCmd &&
+         p.crc == crc8(reinterpret_cast<const uint8_t*>(&p), sizeof(p) - 1);
+}
+inline void sealRcEspNow(RcEspNowPacket& p) {
+  p.magic = kMagicRc;
+  p.crc = crc8(reinterpret_cast<const uint8_t*>(&p), sizeof(p) - 1);
+}
+inline bool checkRcEspNow(const RcEspNowPacket& p) {
+  return p.magic == kMagicRc &&
          p.crc == crc8(reinterpret_cast<const uint8_t*>(&p), sizeof(p) - 1);
 }
 

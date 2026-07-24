@@ -4,7 +4,8 @@ namespace sc {
 
 BehaviorOutput BehaviorPipeline::update(const BehaviorInputs& in) {
   BehaviorOutput out;
-  const GovernorOutput gov = governor_.update(in.sectors);
+  const GovernorOutput gov =
+      governor_.update(in.hasReflexSectors ? in.reflexSectors : in.sectors);
   out.reflex = gov.state;
 
   // ---- MANUAL: sticks -> attitude; only the reflex brake intervenes. ----
@@ -59,7 +60,7 @@ BehaviorOutput BehaviorPipeline::update(const BehaviorInputs& in) {
 
   // ---- BVC: inter-agent filter (shared frame). ----
   Vec2 v = vDes;
-  if (in.table) v = bvc_.constrain(v, in.self.pose.p, *in.table, in.nowMs);
+  if (in.table) v = bvc_.constrainVelocity(v, in.self.pose.p, *in.table, in.nowMs);
 
   // ---- VFH-lite: steer around environment obstacles (body frame). ----
   const float yaw = in.self.pose.yaw;

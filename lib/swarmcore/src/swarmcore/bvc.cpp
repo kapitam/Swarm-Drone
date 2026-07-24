@@ -2,7 +2,7 @@
 
 namespace sc {
 
-Vec2 Bvc::constrain(const Vec2& desired, const Vec2& selfPos,
+Vec2 Bvc::constrainVelocity(const Vec2& desired, const Vec2& selfPos,
                     const NeighborTable& table, uint32_t nowMs) const {
   Vec2 v = desired;
   // Two passes: projecting onto one plane can violate another; at swarm
