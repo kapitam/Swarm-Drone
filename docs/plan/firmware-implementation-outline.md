@@ -84,13 +84,18 @@ that specifies the design.
 - **B3 Gradient fallback**: hop-count gradient beacons (operator = seed), follow-the-gradient homing
   and RSSI-threshold dispersion — active when pose quality degrades. *Source: doc 01 §7.2, doc 06.*
 
-### WP6 — Obstacle avoidance
-- VL53L5CX driver (I²C, 8×8 @ 15 Hz; handle the ~90 KB firmware upload at boot) feeding `tAvoid`.
-- Layered avoidance per doc 02: (1) hard stop-reflex / speed governor on raw min-distance,
-  (2) VFH+ polar-histogram steering with bug/wall-follow escape, (3) BVC inter-agent filter over
-  the neighbor table (positions only — matches our packet).
-- ML depth estimation: **explicitly out of scope** per doc 05's verdict; revisit criteria documented there.
-  *Source: doc 02 §recommendation, doc 05.*
+### WP6 — Obstacle avoidance (versioned; see [avoidance-method-versions.md](avoidance-method-versions.md))
+- Deliver the shared consumers first: `PerceptionSource` (K-sector polar distance array) and
+  `NeighborSource` (neighbor table) interfaces, VFH+ steering, speed governor, stop-reflex, and the
+  BVC inter-agent filter — all version-agnostic.
+- Then one driver module per perception version, starting with **V1 ToF** (VL53L5CX, I²C, 8×8 @
+  15 Hz; handle the ~90 KB firmware upload at boot) as the reference implementation; V5 ultrasonic
+  and V6 comms-only are nearly free; V3 lidar / V4 mmWave as hardware lands.
+- **WP6b — Vision track (Build B)**: the camera + ML depth version per doc 07 spec — SD data logger
+  (frames + co-mounted ToF sector labels), host training pipeline (PyTorch → int8 → TFLM/ESP-NN),
+  OTA model update, camera-vs-ToF agreement telemetry. Runs in parallel after M2 on ESP32-S3
+  camera hardware; advisory-only (stop-reflex stays with the ToF/speed cap).
+  *Source: doc 02 §recommendation, docs 05 & 07, versions plan.*
 
 ### WP7 — Simulator and tuning pipeline (host-side, not firmware)
 - Minimal 2-D kinematic simulator (Python) with the vehicle motion model and a radio model replaying
@@ -114,7 +119,8 @@ that specifies the design.
 | M2 pose exchange | 2+ vehicles broadcasting/receiving pose, link stats collected | WP3–WP4 |
 | M3 first swarm demo | Leader–follower with human leader | WP5(B1) |
 | M4 flocking | Boids/APF with simulator-tuned gains, geofence | WP5(B2), WP7 |
-| M5 avoidance | ToF + VFH+ + stop reflex + BVC active during flocking | WP6 |
+| M5a avoidance (Build A) | ToF + VFH+ + stop reflex + BVC active during flocking | WP6 |
+| M5b vision track (Build B) | Camera advisory sectors live, agreement telemetry vs ToF | WP6b |
 | M6 robustness | Gradient fallback, degraded-radio behavior, endurance runs | WP5(B3), WP8 |
 
 ## 3. Explicitly deferred (with triggers)

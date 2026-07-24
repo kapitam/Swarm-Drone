@@ -14,9 +14,12 @@ documents as their starting brief.
 | [04-rtos-and-firmware-architecture.md](04-rtos-and-firmware-architecture.md) | RTOS choice & firmware architecture | FreeRTOS is already running under Arduino on ESP32; the decision is how much of it to control. Recommend migrating toward native ESP-IDF (via pioarduino, then Arduino-as-component). Headline architecture: 500 Hz control task pinned to core 1, woken by hardware-timer ISR; all radio/comms on core 0; single-slot overwrite queues between them. |
 | [05-ml-depth-estimation.md](05-ml-depth-estimation.md) | Should ML depth estimation be added for obstacle avoidance / inter-robot distance? | **No, not now.** MCU monocular depth is ~1 Hz-class and relative-only, while the VL53L5CX measures metric depth at 15 Hz for $33; learned inter-robot vision needs a GAP8-class accelerator. Pose broadcast (+ optional UWB later) dominates. Doc includes explicit revisit criteria. |
 | [06-swarm-algorithms-catalog.md](06-swarm-algorithms-catalog.md) | Quick-reference catalog | Condensed one-table-per-category summary of all 17 algorithm families investigated (coordination + inter-agent avoidance), with verdicts and the ranked recommendation. |
+| [07-camera-depth-version-spec.md](07-camera-depth-version-spec.md) | Design spec for the camera + ML depth version | Experimental track: XIAO ESP32S3 Sense (~$14), "SectorNet-8" int8 sector classifier (25–50 ms inference, 10–15 Hz), self-supervised training with the co-mounted VL53L5CX as teacher, advisory-only integration, explicit exit criteria. |
 
-Implementation planning lives in [docs/plan/firmware-implementation-outline.md](../plan/firmware-implementation-outline.md)
-(work packages, milestones, open decisions — awaiting review).
+Implementation planning lives in `docs/plan/`:
+[firmware-implementation-outline.md](../plan/firmware-implementation-outline.md) (work packages,
+milestones, open decisions) and [avoidance-method-versions.md](../plan/avoidance-method-versions.md)
+(the parallel perception/avoidance version tracks and named builds A–F).
 
 ## Cross-cutting conclusions
 
