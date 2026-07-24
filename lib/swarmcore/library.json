@@ -1,0 +1,8 @@
+{
+  "name": "swarmcore",
+  "version": "0.1.0",
+  "description": "Portable (no-Arduino) core logic for the swarm drone: packets, sector reduction, neighbor table, flocking, VFH-lite, BVC, governor, AHRS, attitude control, mixer, arming, behavior pipeline. Unit-tested natively.",
+  "build": {
+    "srcDir": "src"
+  }
+}
