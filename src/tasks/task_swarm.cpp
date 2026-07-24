@@ -30,13 +30,19 @@ static void handleCmd(const sc::CmdPacket& c) {
       Serial.println("[swarm] E-STOP received");
       break;
     case sc::kCmdSetMode:
-      if (c.arg0 <= uint8_t(sc::BehaviorMode::kDisperse)) snap.mode = c.arg0;
+      if (c.arg0 <= sc::kBehaviorModeMax) snap.mode = c.arg0;
       break;
     case sc::kCmdZeroPose:
       g_bus.requestZeroPose();
       break;
     case sc::kCmdSetLeader:
       snap.leaderId = c.arg0;
+      break;
+    case sc::kCmdSetGoal:
+      // GPS/computer seam: goal in shared-frame meters (a ground computer,
+      // or later the GPS-equipped leader, streams these). arg0=0 clears.
+      snap.hasGoal = (c.arg0 != 0);
+      snap.goal = {c.argF, c.argF2};
       break;
     case sc::kCmdSetParam:
       // Param 1 = robot id; persisted only while disarmed (doc 04: no NVS
@@ -67,6 +73,7 @@ static void dispatch(const espnow_link::RxItem& item) {
 
 static void sendBeacon(uint16_t& seq) {
   const ControlSnapshot ctrl = g_bus.control();
+  const sc::BehaviorOutput behav = g_bus.behavior();
   sc::StatePacket p{};
   p.id = config_store::robotId();
   p.seq = seq++;
@@ -75,6 +82,10 @@ static void sendBeacon(uint16_t& seq) {
   p.zCm = int16_t(ctrl.state.z * 100.0f);
   p.vxCmS = int16_t(ctrl.state.vel.x * 100.0f);
   p.vyCmS = int16_t(ctrl.state.vel.y * 100.0f);
+  // Commanded velocity: on a manually flown leader this is the stick intent;
+  // MIMIC followers track it (CONOPS: leader-led flock over ESP-NOW).
+  p.cmdVxCmS = int16_t(behav.commandedVel.x * 100.0f);
+  p.cmdVyCmS = int16_t(behav.commandedVel.y * 100.0f);
   p.headingMrad = int16_t(sc::wrapPi(ctrl.state.pose.yaw) * 1000.0f);
   p.mode = snap.mode;
   p.gradient = gradient.value();
@@ -87,11 +98,14 @@ static void sendBeacon(uint16_t& seq) {
 }
 
 static void taskFn(void*) {
+  snap.mode = DEFAULT_BEHAVIOR_MODE;
+  snap.leaderId = LEADER_ID_DEFAULT;
   if (!espnow_link::init())
     Serial.println("[swarm] ERROR: ESP-NOW init failed");
   else
-    Serial.printf("[swarm] ESP-NOW up, channel %d, robot id %u\n",
-                  ESPNOW_CHANNEL, config_store::robotId());
+    Serial.printf("[swarm] ESP-NOW up, channel %d, robot id %u, mode %u, "
+                  "leader %u\n", ESPNOW_CHANNEL, config_store::robotId(),
+                  snap.mode, snap.leaderId);
 
   // Per-robot beacon phase jitter breaks fleet-wide TX synchronization on
   // the CSMA-weak broadcast channel (doc 01 s6.2).

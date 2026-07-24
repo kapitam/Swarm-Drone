@@ -104,8 +104,35 @@ id 0 (operator station).
 ### 3.4 Behavior modes (runtime, via CmdPacket SET_MODE)
 
 `MANUAL` (sticks → attitude; reflex brake only), `HOLD`, `LEADER_FOLLOW`
-(slot offset behind leader, coast→lost degradation), `FLOCK` (boids +
-geofence), `DISPERSE` (separation only). E-stop overrides everything.
+(slot offset behind leader — needs a usable shared frame), `FLOCK` (boids +
+geofence + optional goal), `DISPERSE` (separation only), `MIMIC` (track the
+leader's broadcast commanded velocity — no shared frame needed). E-stop
+overrides everything.
+
+### 3.5 Concept of operations (owner's intent, 2026-07-24)
+
+**One leader drone, manually flown; the flock follows it.**
+
+- The operator's transmitter talks **nRF24** to the **leader** only (the
+  existing RC hardware, `RC_LINK_NRF24`, MANUAL mode). Stick inputs steer the
+  leader; its raw translation intent is broadcast in every `StatePacket`
+  (`cmdVx/cmdVy`) over **ESP-NOW**.
+- **Followers** run ESP-NOW only and boot into **MIMIC** (build flags
+  `DEFAULT_BEHAVIOR_MODE=5`, `LEADER_ID_DEFAULT=<leader id>`): they reproduce
+  the leader's commanded velocity — "as much forward as the operator pushes"
+  — while BVC keeps them separated, VFH steers each around obstacles, and the
+  ToF governor retains final authority per vehicle. Leader silent > 1.2 s →
+  followers hold. MIMIC deliberately needs **no shared position frame**, so
+  it survives dead-reckoning drift; `LEADER_FOLLOW` (rigid slots) and `FLOCK`
+  are the upgrades once positioning improves (flow/GPS/UWB).
+- **The manual source is exchangeable for a computer/GPS source.** The seam
+  is `CmdPacket kCmdSetGoal` (x, y meters in the shared frame): a ground
+  computer — or later the **GPS-equipped leader** itself — streams goal
+  coordinates; FLOCK's goal term consumes them. Because MIMIC followers track
+  whatever the leader *commands* (manual or autonomous), swapping the
+  leader's command source from sticks to a GPS waypoint follower changes
+  nothing for the rest of the fleet. GPS hardware/bring-up plan:
+  ROADMAP §2.4.
 
 ---
 

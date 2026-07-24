@@ -13,6 +13,7 @@ struct Neighbor {
   uint8_t  id = 0xFF;
   Pose2D   pose;          // as last reported
   Vec2     vel;
+  Vec2     cmdVel;        // sender's commanded/intended velocity (world frame)
   float    z = 0.0f;
   uint8_t  mode = 0;
   uint8_t  gradient = 0xFF;

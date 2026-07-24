@@ -28,6 +28,7 @@ bool NeighborTable::update(const StatePacket& p, uint32_t nowMs, uint8_t selfId)
   slot->pose.yaw = p.headingMrad * 1e-3f;
   slot->z = p.zCm * 0.01f;
   slot->vel = {p.vxCmS * 0.01f, p.vyCmS * 0.01f};
+  slot->cmdVel = {p.cmdVxCmS * 0.01f, p.cmdVyCmS * 0.01f};
   slot->mode = p.mode;
   slot->gradient = p.gradient;
   slot->flags = p.flags;

@@ -53,7 +53,49 @@ hardware glue → `src/platform` or a task; new perception = publish a
   `task_control.cpp` consumes the setpoint unchanged. Update `VehicleState.z`.
 - **Done when:** HOLD keeps altitude ±15 cm indoors.
 
-### 2.3 Optical-flow velocity odometry (replaces the placeholder estimator)
+### 2.3 Leader-led flock demo (the CONOPS milestone)
+- **Why:** this is the owner's stated operating concept (HANDBOOK §3.5):
+  operator flies the leader on the nRF24 transmitter; followers MIMIC over
+  ESP-NOW.
+- **Already established:** MIMIC mode, leader stick-intent broadcast
+  (`StatePacket.cmdVx/cmdVy`), boot-role flags (`DEFAULT_BEHAVIOR_MODE`,
+  `LEADER_ID_DEFAULT`) are implemented and unit-tested; degradation =
+  coast 400 ms → hold at 1.2 s silent (doc 01 §3.4 mitigations).
+- **Build recipe:** leader env = `devkit_v1_tof` (nRF24 RC, id 1); follower
+  env = any ESP-NOW build with `-D DEFAULT_BEHAVIOR_MODE=5 -D
+  LEADER_ID_DEFAULT=1 -D ROBOT_ID_DEFAULT=<2,3,...>`.
+- **Done when:** two followers translate with the leader's stick inputs on
+  the bench (props off: watch `commandedVel` in telemetry), then in flight;
+  killing the leader mid-run makes followers hold, not wander.
+
+### 2.4 GPS on the leader + computer-sent coordinates (the exchangeable source)
+- **Why:** owner's intent — manual control now, computer streaming GPS
+  coordinates later, with GPS on the lead drone.
+- **Already established:** Vásárhelyi's 30-drone flock (doc 01 §5.1) is the
+  direct precedent — leaders/agents broadcast GNSS state, exactly our beacon
+  pattern; doc 01 §2 covers outdoor GPS as the shared-frame fix. The command
+  seam is already in the protocol: `kCmdSetGoal(x, y)` → FLOCK goal term;
+  MIMIC followers are source-agnostic (they track whatever the leader
+  commands, sticks or autopilot).
+- **What to build (leader only):**
+  1. u-blox M10-class GNSS on a spare UART (10 Hz NMEA/UBX), new
+     `src/platform/gps.*` publishing fixes via StateBus.
+  2. Geodetic → local ENU conversion (fix origin at arm point; equirectangular
+     approximation is fine at flock scale) feeding the estimator as the
+     position source when available (`poseValid` then stops decaying).
+  3. A tiny leader-side goal follower: desired velocity = P-controller toward
+     the active `kCmdSetGoal` target (reuse the FLOCK goal term — it already
+     does this); ground computer streams goals over ESP-NOW (any ESP32
+     dongle running the same packet header works as the PC bridge).
+  4. Ground-side: a ~100-line Python/serial bridge script (ESP32 dongle in
+     passthrough) that sends `kCmdSetGoal` from lat/lon after the same ENU
+     conversion. Not in repo yet.
+- **Done when:** with sticks untouched, the flock translates to a
+  computer-sent coordinate and holds there (leader navigates, followers
+  mimic), and RC stick input still overrides instantly (MANUAL is always the
+  operator's escape hatch).
+
+### 2.5 Optical-flow velocity odometry (replaces the placeholder estimator)
 - **Why:** `TiltOdometry` drifts by design; flocking quality is bounded by
   pose quality (doc 01 §2).
 - **Already established:** PMW3901 (~$10–15, SPI, works on Crazyflie's
@@ -81,10 +123,14 @@ hardware glue → `src/platform` or a task; new perception = publish a
 - **Done when:** simulated 5-robot flock at measured PDR shows no collisions
   and cohesion; gains flashed via config header; 2–3 real vehicles flock.
 
-### 3.2 Leader–follower demo (first multi-vehicle milestone)
-- **Already established:** doc 01 ranks this the fastest meaningful demo
-  (human-driven leader removes autonomous navigation). Implementation exists
-  (`leader_follower.*`, `kCmdSetLeader`, coast/lost handling).
+### 3.2 Slot-formation upgrade of the leader demo
+- **Why:** MIMIC (item 2.3) matches velocities but not positions; rigid slot
+  offsets (`LEADER_FOLLOW`) give real formations once pose quality allows
+  (flow odometry 2.5 or GPS 2.4).
+- **Already established:** doc 01 §3.4; implementation exists
+  (`leader_follower.*`, `kCmdSetLeader`, coast/lost handling) and is
+  unit-tested — this item is a flight-test + pose-quality milestone, not new
+  code.
 - **Done when:** follower holds a 1.2 m slot behind a manually flown leader,
   and stops safely when you power the leader off mid-flight.
 
