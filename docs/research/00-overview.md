@@ -12,6 +12,11 @@ documents as their starting brief.
 | [02-obstacle-avoidance.md](02-obstacle-avoidance.md) | Obstacle avoidance sensors & algorithms | VL53L5CX multizone ToF + VFH+ steering for environment obstacles; Buffered Voronoi Cells for inter-agent avoidance (proven on weaker STM32F405 in Crazyflie); a hard stop-reflex layer underneath. Every classical algorithm ticks in <1 ms on ESP32. |
 | [03-esp32-compute-feasibility.md](03-esp32-compute-feasibility.md) | Compute/memory/radio feasibility on the ESP32 family | The classic ESP32 in this repo is sufficient (ESP-FC and ESP-Drone prove 500 Hz–1 kHz loops on this exact chip). Standardize *new* hardware on ESP32-S3 (~34% faster per clock, ~7× TinyML, more RAM). ESP-NOW is the recommended swarm radio over nRF24L01. |
 | [04-rtos-and-firmware-architecture.md](04-rtos-and-firmware-architecture.md) | RTOS choice & firmware architecture | FreeRTOS is already running under Arduino on ESP32; the decision is how much of it to control. Recommend migrating toward native ESP-IDF (via pioarduino, then Arduino-as-component). Headline architecture: 500 Hz control task pinned to core 1, woken by hardware-timer ISR; all radio/comms on core 0; single-slot overwrite queues between them. |
+| [05-ml-depth-estimation.md](05-ml-depth-estimation.md) | Should ML depth estimation be added for obstacle avoidance / inter-robot distance? | **No, not now.** MCU monocular depth is ~1 Hz-class and relative-only, while the VL53L5CX measures metric depth at 15 Hz for $33; learned inter-robot vision needs a GAP8-class accelerator. Pose broadcast (+ optional UWB later) dominates. Doc includes explicit revisit criteria. |
+| [06-swarm-algorithms-catalog.md](06-swarm-algorithms-catalog.md) | Quick-reference catalog | Condensed one-table-per-category summary of all 17 algorithm families investigated (coordination + inter-agent avoidance), with verdicts and the ranked recommendation. |
+
+Implementation planning lives in [docs/plan/firmware-implementation-outline.md](../plan/firmware-implementation-outline.md)
+(work packages, milestones, open decisions — awaiting review).
 
 ## Cross-cutting conclusions
 
