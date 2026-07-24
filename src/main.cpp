@@ -1,67 +1,104 @@
-#include <SPI.h>
-#include <RF24.h>
-#include <ESP32Servo.h>
+// Swarm Drone firmware — entry point.
+//
+// Everything is a FreeRTOS task (research doc 04 architecture); setup() only
+// initializes safe-state hardware and spawns tasks, then loop() retires.
+// Fork selection is entirely in platformio.ini build flags; see
+// docs/HANDBOOK.md for the fork matrix and safety procedures.
+//
+// SAFETY: attitude gains are UNTUNED. First power-up: PROPS OFF.
 
-#define CE_PIN   4
-#define CSN_PIN  5
+#include <Arduino.h>
 
-RF24 radio(CE_PIN, CSN_PIN);
+#include "config/config.h"
+#include "config/config_store.h"
+#include "state_bus.h"
+#include "platform/motors.h"
+#include "platform/rc_link.h"
+#include "platform/tof_vl53l5cx.h"
+#include "vision/vision.h"
+#include "tasks/tasks.h"
 
-SPIClass vspi(VSPI);
+StateBus g_bus;
 
-const byte address[6] = "00001";
-
-Servo esc1;
-
-const int esc1Pin = 25;   // NOT 18
-
-const int minPulse = 1000;
-const int maxPulse = 2000;
-
-struct ControlPacket {
-  uint16_t ch0;
-  uint16_t ch1;
-  uint16_t ch2;
-  uint16_t ch3;
-};
-
-ControlPacket data;
-
-unsigned long lastPacketTime = 0;
-const unsigned long failsafeTimeout = 150;
+static const char* buildDescription() {
+  return
+#if defined(BOARD_XIAO_S3)
+      "XIAO-S3 Vision (Build B)"
+#elif defined(MOTORS_BRUSHED_PWM)
+      "DevKit v1 brushed (Build A')"
+#else
+      "DevKit v1 ESC (Build A)"
+#endif
+      ;
+}
 
 void setup() {
   Serial.begin(115200);
+  delay(100);
 
-  // Start SPI explicitly
-  vspi.begin(18, 19, 23, CSN_PIN); 
-  radio.begin(&vspi);
+  // Motors first, into safe state, before anything can fail.
+  motors::init();
+  motors::stop();
 
-  radio.setDataRate(RF24_1MBPS);
-  radio.setPALevel(RF24_PA_LOW);
-  radio.setChannel(108);
-  radio.openReadingPipe(0, address);
-  radio.startListening();
+  config_store::begin();
+  g_bus.begin();
 
-  esc1.setPeriodHertz(50);
-  esc1.attach(esc1Pin, minPulse, maxPulse);
-  esc1.writeMicroseconds(minPulse);
+  Serial.println();
+  Serial.println("==== Swarm Drone firmware ====");
+  Serial.printf("build: %s | robot id %u\n", buildDescription(),
+                config_store::robotId());
+  Serial.printf("forks: perception[%s%s] motors[%s] imu[%s] rc[%s] vision[%s]\n",
+#if defined(PERCEPTION_V1_TOF)
+                "V1-ToF",
+#else
+                "-",
+#endif
+#if defined(PERCEPTION_V2_VISION)
+                "+V2-Vision",
+#else
+                "",
+#endif
+#if defined(MOTORS_ESC_PWM)
+                "ESC-PWM 50Hz",
+#else
+                "brushed 20kHz",
+#endif
+#if defined(IMU_MPU6050)
+                "MPU6050",
+#elif defined(IMU_ICM42688)
+                "ICM42688",
+#else
+                "MOCK",
+#endif
+#if defined(RC_LINK_NRF24)
+                "nRF24",
+#else
+                "ESP-NOW",
+#endif
+#if defined(VISION_BACKEND_TFLM)
+                "TFLM"
+#elif defined(VISION_BACKEND_STUB)
+                "stub"
+#else
+                "none"
+#endif
+  );
+  Serial.println("SAFETY: gains untuned - props off for first power-up.");
+
+  // Core-0 services first (radio/sensors), then the core-1 real-time pair.
+  task_swarm::start();     // ESP-NOW beacons + commands (+ RC on ESP-NOW fork)
+  rc_link::start();        // nRF24 fork spawns its poll task; ESP-NOW is fed
+  tof::start();            // V1 perception (no-op when not compiled in)
+  vision::start();         // V2 perception (no-op when not compiled in)
+  task_telem::start();
+
+  task_avoid::start();     // core 1, 50 Hz behavior/avoidance
+  task_control::start();   // core 1, 500 Hz control loop
+
+  Serial.println("[main] all tasks started");
 }
 
 void loop() {
-
-  if (radio.available()) {
-    radio.read(&data, sizeof(data));
-    lastPacketTime = millis();
-
-    int throttle = map(data.ch0, 0, 1023, minPulse, maxPulse);
-    throttle = constrain(throttle, minPulse, maxPulse);
-
-    esc1.writeMicroseconds(throttle);
-  }
-
-  // Failsafe
-  if (millis() - lastPacketTime > failsafeTimeout) {
-    esc1.writeMicroseconds(minPulse);
-  }
+  // Everything lives in tasks; the Arduino loopTask retires.
+  vTaskDelete(nullptr);
 }

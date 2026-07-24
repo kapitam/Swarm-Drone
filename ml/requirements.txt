@@ -1,0 +1,14 @@
+# Host-side training/export pipeline (research doc 09 s3).
+# Python 3.11/3.12 (ai-edge-litert has no 3.13 wheels yet, doc 09 s3.1).
+torch>=2.3
+numpy>=1.26
+onnx>=1.16
+# PyTorch -> TFLite path A (doc 09 s3.1): onnx2tf full-integer quantization.
+# onnx2tf >=2.4 uses the flatbuffer_direct backend (no TensorFlow needed).
+onnx2tf>=2.5.0
+# Host-side .tflite validation/eval interpreter.
+ai-edge-litert>=2.1
+# onnx2tf runtime deps for -oiqt calibration paths:
+onnx-graphsurgeon
+sng4onnx
+onnxsim
