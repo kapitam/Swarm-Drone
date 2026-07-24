@@ -55,26 +55,28 @@ static bool initCamera(int xclkHz) {
 
 // -------------------------------------------------------------- SD logger --
 #if defined(DATALOGGER_SD)
-// Binary record, little-endian ('SEC1' format, HANDBOOK "Dataset format";
-// field-compatible superset of research doc 09 s4.4 — parsed by ml/dataset.py).
+// Binary record, little-endian ('SEC1' format, research doc 09 s4.4 with the
+// attitude fields swapped in for AEC/AGC — 9,439 B, parsed by ml/dataset.py).
+// RAW ToF zones on disk so bin edges can be re-tuned without re-flying.
 #pragma pack(push, 1)
 struct LogRecord {
   uint32_t magic;        // 0x53454331 'SEC1'
   uint16_t seq;
   uint32_t tCapMs;       // frame capture time
-  uint32_t tTofMs;       // paired ToF sector stamp (skew gate at train time)
+  uint32_t tTofMs;       // paired ToF frame stamp (skew gate at train time)
   uint8_t  img[VISION_IMG_W * VISION_IMG_H];
-  uint16_t tofSectorMm[8];   // the fused ToF SECTOR view at capture time
-  uint8_t  tofValidZones[8];
+  uint16_t tofMm[64];    // raw VL53L5CX 8x8 distances, row-major
+  uint8_t  tofStatus[64];// per-zone target_status (5/9 = valid)
   int16_t  rollMrad, pitchMrad, yawMrad;
   uint8_t  batteryDv;
   uint8_t  modelVer;
   uint8_t  predBins[8];  // live model shadow-mode output (0xFF = none)
-  uint8_t  crc;          // crc8 over header+tail (img excluded, doc 09)
+  uint8_t  crc;          // crc8 over post-img tail (img excluded, doc 09)
 };
 #pragma pack(pop)
-static_assert(sizeof(LogRecord) == 4 + 2 + 4 + 4 + 9216 + 16 + 8 + 6 + 1 + 1 + 8 + 1,
-              "LogRecord layout");
+static_assert(sizeof(LogRecord) ==
+                  4 + 2 + 4 + 4 + 9216 + 128 + 64 + 6 + 1 + 1 + 8 + 1,
+              "LogRecord layout (9439 B)");
 
 static QueueHandle_t logQ = nullptr;      // indices into the PSRAM ring
 static LogRecord* ring = nullptr;         // 4 records in PSRAM
@@ -90,8 +92,8 @@ static void loggerTask(void*) {
     if (!sdOk || !logFile) continue;
     LogRecord& r = ring[idx];
     // Seal: crc over everything after img (cheap; img excluded per doc 09).
-    const uint8_t* tail = reinterpret_cast<const uint8_t*>(r.tofSectorMm);
-    const size_t tailLen = sizeof(LogRecord) - offsetof(LogRecord, tofSectorMm) - 1;
+    const uint8_t* tail = reinterpret_cast<const uint8_t*>(r.tofMm);
+    const size_t tailLen = sizeof(LogRecord) - offsetof(LogRecord, tofMm) - 1;
     r.crc = sc::crc8(tail, tailLen);
     logFile.write(reinterpret_cast<const uint8_t*>(&r), sizeof(r));
     static int sinceFlush = 0;
@@ -136,14 +138,13 @@ static void logFrame(const uint8_t* img, uint32_t tCap) {
   r.magic = 0x53454331;
   r.seq = logSeq++;
   r.tCapMs = tCap;
-  const sc::SectorArray tofS = g_bus.tofSectors();
-  r.tTofMs = tofS.stampMs;
+  TofGrid grid;
+  g_bus.tofGrid(grid);
+  r.tTofMs = grid.stampMs;
   memcpy(r.img, img, sizeof(r.img));
-  for (int i = 0; i < 8; ++i) {
-    r.tofSectorMm[i] = tofS.distMm[i];
-    r.tofValidZones[i] = tofS.validZones[i];
-    r.predBins[i] = predBins[i];
-  }
+  memcpy(r.tofMm, grid.distMm, sizeof(r.tofMm));
+  memcpy(r.tofStatus, grid.status, sizeof(r.tofStatus));
+  for (int i = 0; i < 8; ++i) r.predBins[i] = predBins[i];
   const ControlSnapshot cs = g_bus.control();
   r.rollMrad = int16_t(cs.state.roll * 1000.0f);
   r.pitchMrad = int16_t(cs.state.pitch * 1000.0f);

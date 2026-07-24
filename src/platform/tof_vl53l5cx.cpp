@@ -72,6 +72,14 @@ static void taskFn(void*) {
     }
     const uint32_t now = millis();
     g_bus.publishTofSectors(filter.update(dist, status, nb, now));
+#if defined(PERCEPTION_V2_VISION)
+    // Raw grid for the dataset logger (labels derived offline, doc 09 s4.4).
+    TofGrid grid;
+    memcpy(grid.distMm, dist, sizeof(grid.distMm));
+    memcpy(grid.status, status, sizeof(grid.status));
+    grid.stampMs = now;
+    g_bus.publishTofGrid(grid);
+#endif
     lastFrameMs = now;
     healthy_ = true;
   }

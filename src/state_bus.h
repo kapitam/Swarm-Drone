@@ -37,6 +37,14 @@ struct SwarmSnapshot {
   bool hasGoal = false;
 };
 
+// Raw VL53L5CX frame for the dataset logger (train-time label derivation
+// happens offline from raw zones — research doc 09 s4.4).
+struct TofGrid {
+  uint16_t distMm[64] = {0};
+  uint8_t status[64] = {0};
+  uint32_t stampMs = 0;
+};
+
 class StateBus {
  public:
   void begin() {
@@ -94,6 +102,16 @@ class StateBus {
     portEXIT_CRITICAL(&mux_);
     return c;
   }
+  void publishTofGrid(const TofGrid& g) {
+    portENTER_CRITICAL(&gridMux_);
+    grid_ = g;
+    portEXIT_CRITICAL(&gridMux_);
+  }
+  void tofGrid(TofGrid& out) {
+    portENTER_CRITICAL(&gridMux_);
+    out = grid_;
+    portEXIT_CRITICAL(&gridMux_);
+  }
 
   // ---- Swarm view (writer: swarm task) ----
   void publishSwarm(const SwarmSnapshot& s) {
@@ -150,6 +168,8 @@ class StateBus {
  private:
   portMUX_TYPE mux_ = portMUX_INITIALIZER_UNLOCKED;
   portMUX_TYPE swarmMux_ = portMUX_INITIALIZER_UNLOCKED;
+  portMUX_TYPE gridMux_ = portMUX_INITIALIZER_UNLOCKED;
+  TofGrid grid_;
   RcSnapshot rc_;
   ControlSnapshot ctrl_;
   sc::SectorArray tof_, vision_;
