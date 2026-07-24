@@ -5,6 +5,11 @@ whole repository or the chat history that produced it: what exists, what is
 proven vs untested, which decisions are still open (the "forks"), and the
 exact procedures for bring-up, training, and tuning. Written 2026-07-24.
 
+Companion documents: [ROADMAP.md](ROADMAP.md) (what to build next, research
+pre-digested per item), [research/README.md](research/README.md) (annotated
+research index), and per-directory READMEs in `lib/swarmcore`, `src`, `ml`,
+`test` for code navigation.
+
 ---
 
 ## 1. Project state at a glance
@@ -220,6 +225,10 @@ later, switch that env to a `huge_app.csv` partition table (4 MB flash is
 plenty; OTA would need a different scheme).
 
 ## 9. Suggested next steps (in order)
+
+> The expanded version of this list — each item with the relevant research
+> findings inlined, the code seam to modify, and acceptance criteria — is
+> [ROADMAP.md](ROADMAP.md). Use that as the working guide; this is the recap.
 
 1. Buy: 1× XIAO ESP32S3 Sense, 2× VL53L5CX breakout, (optional 2nd devkit),
    props-off bench rig. Later: PMW3901 flow + VL53L1X down-ranger for
