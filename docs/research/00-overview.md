@@ -17,10 +17,17 @@ documents as their starting brief.
 | [07-camera-depth-version-spec.md](07-camera-depth-version-spec.md) | Design spec for the camera + ML depth version | Experimental track: XIAO ESP32S3 Sense (~$14), "SectorNet-8" int8 sector classifier (25–50 ms inference, 10–15 Hz), self-supervised training with the co-mounted VL53L5CX as teacher, advisory-only integration, explicit exit criteria. |
 | [08-v1-tof-integration.md](08-v1-tof-integration.md) | V1 VL53L5CX driver integration deep-dive | SparkFun lib 1.0.3 (`setWireMaxPacketSize(128)`, 86 KB firmware upload from flash: 2.8 s @400 kHz / 1.4 s @1 MHz); flight-proven config 8×8@15 Hz continuous + closest-target; sector reduction = column min-pool over rows 2–5 with `status ∈ {5,9} && nb_targets==1`; stop reflex 0.40 m, governor bands 0.7/1.4 m, cruise 0.5 m/s (cap 1.0); LPn multi-sensor procedure + ST's interference guidance; full driver checklist and defaults table. |
 
+| [08-v1-tof-integration.md](08-v1-tof-integration.md) | V1 ToF integration deep-dive | SparkFun lib 1.0.3, 8x8@15 Hz CONTINUOUS/CLOSEST, `setWireMaxPacketSize(128)`, status {5,9} validity, rows 2–5 min-pool, governor knots 400/700/1400 mm — the implemented driver recipe. |
+| [09-v2-ml-pipeline.md](09-v2-ml-pipeline.md) | V2 ML pipeline deep-dive | TFLM 1.3.7 + ESP-NN ship inside Arduino core 3.3.x (pioarduino 55.03.311, compile-verified); onnx2tf int8 path; 96×96 grayscale direct capture; SD logging 3–10× margin; both model forks specced. |
+
 Implementation planning lives in `docs/plan/`:
 [firmware-implementation-outline.md](../plan/firmware-implementation-outline.md) (work packages,
 milestones, open decisions) and [avoidance-method-versions.md](../plan/avoidance-method-versions.md)
 (the parallel perception/avoidance version tracks and named builds A–F).
+
+**The firmware now exists** — see [docs/HANDBOOK.md](../HANDBOOK.md), the self-contained handoff
+document covering architecture, the fork matrix awaiting decision, safety procedures, and the
+V2 training workflow.
 
 ## Cross-cutting conclusions
 

@@ -1,11 +1,15 @@
-# Firmware Implementation Outline (for review)
+# Firmware Implementation Outline
 
-**Status: OUTLINE FOR REVIEW — no code yet.** This document translates the research phase
-(`docs/research/00-overview.md` and docs 01–06) into the concrete list of things that need to be
-coded, so humans and agents can review scope and ordering before firmware work starts.
+**Status update (2026-07-24): first firmware build LANDED.** WP0–WP6 (skeleton, vehicle
+abstraction, estimation placeholder, ESP-NOW comms, behaviors, versioned avoidance incl. the
+WP6b vision track) plus the ml/ training pipeline now exist and compile for all four envs; see
+`docs/HANDBOOK.md` for the authoritative current-state document. Open decision D1 is resolved:
+**the platform is a quad PCB drone** (hardware specifics still open as build-time forks).
+Remaining work from this outline: WP7 simulator/tuning, altitude/velocity sensing addons,
+flight testing. The original outline follows for traceability.
 
-Current baseline in the repo: a single-file Arduino superloop (`src/main.cpp`) that receives
-nRF24L01 RC packets and drives one ESC, with a 150 ms failsafe. Everything below builds from that.
+Current baseline in the repo before this build: a single-file Arduino superloop (`src/main.cpp`)
+that receives nRF24L01 RC packets and drives one ESC, with a 150 ms failsafe.
 
 ---
 
