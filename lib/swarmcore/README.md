@@ -30,7 +30,7 @@ forward, y left, z up; `wrapPi` everywhere.
 | `arming.h` | DISARMED→ARMING→ARMED→FAILSAFE(+ latched ESTOP) state machine; stick gestures; 150 ms RC-loss cut; low-battery | original sketch semantics preserved |
 | `estimator.h` | `TiltOdometry` — **placeholder** dead-reckoning (tilt→accel model with drag). Replace via same interface when optical-flow/UWB addon lands | doc 01 §2 honest-gap |
 | `rc.h` | 1000–2000 µs → normalized channels with deadband | — |
-| `behavior.h/.cpp` | `BehaviorPipeline` — the arbitration layer: mode source (manual/hold/follow/flock/disperse) → BVC → VFH → governor → `AttitudeSetpoint`. Manual keeps pilot authority (reflex brake only). Separate *steering* vs *reflex* sector views (reflex = ToF only) | docs 01 §4.4, 05/07 rule |
+| `behavior.h/.cpp` | `BehaviorPipeline` — the arbitration layer: mode source (manual/hold/follow/flock/disperse/**mimic**) → BVC → VFH → governor → `AttitudeSetpoint`. Manual keeps pilot authority (reflex brake only) and broadcasts the raw stick intent for MIMIC followers (leader-led flock CONOPS, HANDBOOK §3.5). Separate *steering* vs *reflex* sector views (reflex = ToF only) | docs 01 §4.4, 05/07 rule |
 
 ## Invariants to preserve
 

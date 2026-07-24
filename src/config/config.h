@@ -5,9 +5,19 @@
 #include <stdint.h>
 #include "pins.h"
 
-// ---- Identity -------------------------------------------------------------
+// ---- Identity / role --------------------------------------------------------
 #ifndef ROBOT_ID_DEFAULT
 #define ROBOT_ID_DEFAULT 1      // overridden by NVS ("robot.id"), set via CmdPacket
+#endif
+// CONOPS (HANDBOOK s3.5): one manually-flown leader (nRF24 RC + MANUAL),
+// followers boot into MIMIC tracking LEADER_ID_DEFAULT over ESP-NOW.
+// Override per-vehicle with -D DEFAULT_BEHAVIOR_MODE=5 etc., or at runtime
+// via CmdPacket kCmdSetMode / kCmdSetLeader.
+#ifndef DEFAULT_BEHAVIOR_MODE
+#define DEFAULT_BEHAVIOR_MODE 0   // 0=MANUAL 1=HOLD 2=FOLLOW 3=FLOCK 4=DISPERSE 5=MIMIC
+#endif
+#ifndef LEADER_ID_DEFAULT
+#define LEADER_ID_DEFAULT 1       // the manually flown leader drone's robot id
 #endif
 
 // ---- Task ladder (doc 04 s7.2). Higher = more urgent; app tasks stay below

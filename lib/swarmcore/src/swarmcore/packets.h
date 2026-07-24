@@ -38,7 +38,11 @@ struct StatePacket {
   uint16_t seq;          // wraps; used for loss estimation
   int16_t  xCm, yCm;     // position in shared frame [cm]
   int16_t  zCm;          // altitude [cm]
-  int16_t  vxCmS, vyCmS; // velocity [cm/s]
+  int16_t  vxCmS, vyCmS; // velocity estimate [cm/s]
+  // Commanded/intended planar velocity [cm/s], world frame. For a manually
+  // flown leader this is the stick intent — followers in MIMIC mode track it
+  // without needing a shared position frame (CONOPS: leader-led flock).
+  int16_t  cmdVxCmS, cmdVyCmS;
   int16_t  headingMrad;  // yaw [milliradians], wrapped (-3142..3142]
   uint8_t  mode;         // BehaviorMode
   uint8_t  gradient;     // hop count to seed (255 = unknown/infinity)
@@ -46,7 +50,7 @@ struct StatePacket {
   uint8_t  batteryDv;    // battery [deciVolt] (e.g. 3.8 V -> 38)
   uint32_t tMs;          // sender millis at send time (coarse latency estimate)
   uint8_t  crc;
-};  // 25 bytes
+};  // 29 bytes (still fits a 32 B nRF24 frame if ever relayed)
 
 enum StateFlags : uint8_t {
   kFlagArmed      = 1 << 0,
@@ -60,6 +64,10 @@ enum CmdType : uint8_t {
   kCmdZeroPose = 3,   // re-zero dead-reckoned pose at current location
   kCmdSetParam = 4,   // arg0 = param id, argF = value
   kCmdSetLeader= 5,   // arg0 = leader robot id
+  kCmdSetGoal  = 6,   // argF = x [m], argF2 = y [m] in the shared frame.
+                      // THE GPS/computer seam: a ground computer (or a
+                      // GPS-equipped leader) streams goals here; FLOCK's
+                      // goal term consumes them. arg0 = 0 clears the goal.
 };
 
 // Operator command, broadcast; targetId 0xFF = whole fleet.
@@ -69,9 +77,10 @@ struct CmdPacket {
   uint8_t  type;      // CmdType
   uint8_t  arg0;
   float    argF;
+  float    argF2;
   uint32_t tMs;
   uint8_t  crc;
-};  // 13 bytes
+};  // 17 bytes
 
 // RC over ESP-NOW (RC_LINK_ESPNOW fork): the legacy 4-channel payload wrapped
 // with magic + target + crc so it can share the broadcast channel.
@@ -84,8 +93,8 @@ struct RcEspNowPacket {
 #pragma pack(pop)
 
 static_assert(sizeof(RcPacket) == 8, "RcPacket layout");
-static_assert(sizeof(StatePacket) == 25, "StatePacket layout");
-static_assert(sizeof(CmdPacket) == 13, "CmdPacket layout");
+static_assert(sizeof(StatePacket) == 29, "StatePacket layout");
+static_assert(sizeof(CmdPacket) == 17, "CmdPacket layout");
 static_assert(sizeof(RcEspNowPacket) == 11, "RcEspNowPacket layout");
 
 inline void sealState(StatePacket& p) {
