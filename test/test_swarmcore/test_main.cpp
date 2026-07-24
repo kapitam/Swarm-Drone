@@ -386,6 +386,58 @@ static void test_behavior_hold_zero_velocity() {
   TEST_ASSERT_FLOAT_WITHIN(0.02f, 0.0f, o.setpoint.rollAngle);
 }
 
+static void test_behavior_manual_broadcasts_stick_intent() {
+  BehaviorPipeline bp;
+  BehaviorInputs in;
+  in.mode = BehaviorMode::kManual;
+  in.rc.pitch = 1.0f;                 // full forward
+  in.sectors = mkSectors(300);        // reflex braking active...
+  in.self.pose.yaw = 0.0f;
+  BehaviorOutput o = bp.update(in);
+  // ...but the broadcast intent stays the RAW stick (followers have their
+  // own safety): vMax forward in world frame.
+  TEST_ASSERT_FLOAT_WITHIN(0.05f, 1.0f, o.commandedVel.x);
+  TEST_ASSERT_FLOAT_WITHIN(1e-3f, 0.0f, o.setpoint.pitchAngle);  // own brake
+}
+
+static StatePacket mkLeaderCmd(uint8_t id, uint16_t seq, float cvx, float cvy) {
+  StatePacket p = mkState(id, seq, 0.0f, 0.0f, 0.0f, 0.0f);
+  p.cmdVxCmS = int16_t(cvx * 100);
+  p.cmdVyCmS = int16_t(cvy * 100);
+  sealState(p);
+  return p;
+}
+
+static void test_behavior_mimic_tracks_leader_cmd() {
+  BehaviorPipeline bp;
+  bp.setLeader(0);
+  NeighborTable t;
+  t.update(mkLeaderCmd(0, 1, 0.6f, 0.0f), 1000, 5);  // leader wants 0.6 m/s +x
+
+  BehaviorInputs in;
+  in.mode = BehaviorMode::kMimic;
+  in.table = &t;
+  in.nowMs = 1100;
+  in.sectors = mkSectors(1900);
+  in.self.pose.yaw = 0.0f;
+  BehaviorOutput o = bp.update(in);
+  TEST_ASSERT_EQUAL_INT(int(FollowStatus::kTracking), int(o.followStatus));
+  TEST_ASSERT_FLOAT_WITHIN(0.1f, 0.6f, o.commandedVel.x);
+
+  // Leader silent past lostMs -> LOST, hold (zero velocity).
+  in.nowMs = 1000 + 1500;
+  o = bp.update(in);
+  TEST_ASSERT_EQUAL_INT(int(FollowStatus::kLost), int(o.followStatus));
+  TEST_ASSERT_FLOAT_WITHIN(1e-3f, 0.0f, o.commandedVel.norm());
+
+  // Governor still overrides mimic: obstacle at 30 cm -> no forward motion.
+  t.update(mkLeaderCmd(0, 2, 0.6f, 0.0f), 3000, 5);
+  in.nowMs = 3050;
+  in.sectors = mkSectors(300);
+  o = bp.update(in);
+  TEST_ASSERT_TRUE(o.commandedVel.x <= 1e-3f);
+}
+
 static void test_behavior_fear_backs_away() {
   BehaviorPipeline bp;
   NeighborTable t;
@@ -425,6 +477,8 @@ int main(int, char**) {
   RUN_TEST(test_arming_estop_latch);
   RUN_TEST(test_behavior_manual_reflex_brake);
   RUN_TEST(test_behavior_hold_zero_velocity);
+  RUN_TEST(test_behavior_manual_broadcasts_stick_intent);
+  RUN_TEST(test_behavior_mimic_tracks_leader_cmd);
   RUN_TEST(test_behavior_fear_backs_away);
   return UNITY_END();
 }

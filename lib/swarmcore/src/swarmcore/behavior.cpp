@@ -23,6 +23,17 @@ BehaviorOutput BehaviorPipeline::update(const BehaviorInputs& in) {
     out.setpoint.pitchAngle = pitchCmd * p_.manualMaxTilt;
     out.setpoint.yawRate = in.rc.yaw * p_.manualMaxYawRate;
     out.setpoint.throttle = in.rc.throttle;
+    // Broadcast intent for MIMIC followers (leader-led flock CONOPS): the
+    // RAW stick translation intent as a world-frame velocity. Deliberately
+    // pre-reflex-brake — followers run their own safety layers.
+    {
+      const float cy = cosf(in.self.pose.yaw), sy = sinf(in.self.pose.yaw);
+      const Vec2 vBodyIntent{in.rc.pitch * p_.governor.vMax,
+                             -in.rc.roll * p_.governor.vMax};  // +y = left
+      out.commandedVel = {cy * vBodyIntent.x - sy * vBodyIntent.y,
+                          sy * vBodyIntent.x + cy * vBodyIntent.y};
+      out.desiredVel = out.commandedVel;
+    }
     return out;
   }
 
@@ -53,6 +64,26 @@ BehaviorOutput BehaviorPipeline::update(const BehaviorInputs& in) {
       if (in.table)
         vDes = boids_.compute(in.self, *in.table, in.nowMs, nullptr, true);
       break;
+    case BehaviorMode::kMimic: {
+      // Track the leader's broadcast commanded velocity (no shared frame
+      // needed). Reuses the follow coast/lost timeouts for degradation.
+      const Neighbor* leader =
+          in.table ? in.table->byId(p_.follow.leaderId) : nullptr;
+      if (!leader) {
+        out.followStatus = FollowStatus::kNoLeader;
+      } else {
+        const uint32_t age = in.nowMs - leader->lastHeardMs;
+        if (age > p_.follow.lostMs) {
+          out.followStatus = FollowStatus::kLost;        // hold position
+        } else {
+          out.followStatus = (age > p_.follow.coastMs)
+                                 ? FollowStatus::kCoasting
+                                 : FollowStatus::kTracking;
+          vDes = leader->cmdVel.limited(p_.follow.vMax);
+        }
+      }
+      break;
+    }
     default:
       break;
   }
@@ -97,7 +128,8 @@ BehaviorOutput BehaviorPipeline::update(const BehaviorInputs& in) {
   velocityToTilt(v, in.self.vel, yaw, p_.velTilt,
                  out.setpoint.rollAngle, out.setpoint.pitchAngle);
   out.setpoint.yawRate = 0.0f;
-  if (in.mode == BehaviorMode::kLeaderFollow || in.mode == BehaviorMode::kFlock) {
+  if (in.mode == BehaviorMode::kLeaderFollow ||
+      in.mode == BehaviorMode::kFlock || in.mode == BehaviorMode::kMimic) {
     // Slowly yaw toward travel direction for sensor pointing.
     const float speedN = v.norm();
     if (speedN > 0.15f) {

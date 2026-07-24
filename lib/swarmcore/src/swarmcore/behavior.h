@@ -25,10 +25,17 @@ namespace sc {
 enum class BehaviorMode : uint8_t {
   kManual = 0,
   kHold = 1,
-  kLeaderFollow = 2,
+  kLeaderFollow = 2,  // hold a slot offset from the leader (needs shared frame)
   kFlock = 3,
   kDisperse = 4,
+  // CONOPS mode: followers reproduce the leader's broadcast COMMANDED
+  // velocity (the operator's stick intent on a manually flown leader, or a
+  // GPS/computer-driven leader's autonomous command). Needs NO shared
+  // position frame — robust to dead-reckoning drift. BVC separation, VFH
+  // steering and the governor still apply on top.
+  kMimic = 5,
 };
+constexpr uint8_t kBehaviorModeMax = uint8_t(BehaviorMode::kMimic);
 
 struct BehaviorParams {
   BoidsParams boids;

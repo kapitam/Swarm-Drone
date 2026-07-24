@@ -31,6 +31,11 @@ and data-flow description.
 `MOTORS_ESC_PWM|MOTORS_BRUSHED_PWM`, `IMU_MPU6050|IMU_ICM42688|IMU_MOCK`,
 `RC_LINK_NRF24|RC_LINK_ESPNOW`, `ROBOT_ID_DEFAULT`.
 
+Role flags for the leader-led flock CONOPS (HANDBOOK §3.5): the leader keeps
+defaults (MANUAL + nRF24 RC); followers build with
+`-D DEFAULT_BEHAVIOR_MODE=5 -D LEADER_ID_DEFAULT=<leader id> -D
+ROBOT_ID_DEFAULT=<own id>` to boot straight into MIMIC.
+
 ## Rules of the road
 
 - Real-time work on core 1 only; anything that can block (I2C frames, SD,
